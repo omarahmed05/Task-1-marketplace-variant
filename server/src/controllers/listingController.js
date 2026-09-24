@@ -1,12 +1,22 @@
 import { Listing } from '../models/Listing.js';
-
+import Joi from 'joi';
 // TODO: write a validation schema for create/update per README.md section 2.
-
+const listingSchema = Joi.object({
+  title: Joi.string().min(2).max(100).required(),
+  description: Joi.string().max(1000).allow(''),
+  price: Joi.number().min(0).required(),
+  category: Joi.string().valid('textbooks', 'electronics', 'furniture', 'clothing').default('other'),
+  condition: Joi.string().valid('new', 'like-new', 'used', 'worn').default('used'),
+  status: Joi.string().valid('active', 'sold', 'removed').default('active'),
+  seller: Joi.string().hex().length(24).optional()
+});
 // GET /api/listings
 // TODO: implement per README.md section 3.
 export async function getAllListings(req, res, next) {
   try {
     // TODO
+    const listings = await Listing.find().sort({ createdAt: -1 }).populate('seller').lean();
+    res.json({ listings });
   } catch (err) { next(err); }
 }
 
@@ -14,6 +24,9 @@ export async function getAllListings(req, res, next) {
 // TODO: implement per README.md sections 3 and 5.
 export async function getListing(req, res, next) {
   try {
+    const listing = await Listing.findById(req.params.id).populate('seller').lean();
+    if (!listing) return res.status(404).json({ message: 'Listing not found' });
+    res.json({ listing });
     // TODO
   } catch (err) { next(err); }
 }
@@ -23,6 +36,10 @@ export async function getListing(req, res, next) {
 export async function createListing(req, res, next) {
   try {
     // TODO
+    const { value, error } = listingSchema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+    const listing = await Listing.create(value);
+    res.status(201).json({ listing });
   } catch (err) { next(err); }
 }
 
@@ -31,6 +48,11 @@ export async function createListing(req, res, next) {
 export async function updateListing(req, res, next) {
   try {
     // TODO
+    const { value, error } = listingSchema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+    const listing = await Listing.findByIdAndUpdate(req.params.id, { $set: value }, { new: true, runValidators: true });
+    if (!listing) return res.status(404).json({ message: 'Listing not found' });
+    res.json({ listing });
   } catch (err) { next(err); }
 }
 
@@ -39,5 +61,33 @@ export async function updateListing(req, res, next) {
 export async function deleteListing(req, res, next) {
   try {
     // TODO
+    const listing = await Listing.findByIdAndUpdate(
+      req.params.id,
+      { status: 'removed' },
+      { new: true }
+    );
+    if (!listing) {
+      return res.status(404).json({
+        message: 'Listing not found'
+      });
+    }
+    res.json({ listing });
+  } catch (err) { next(err); }
+}
+
+export async function markListingAsSold(req, res, next) {
+  try {
+    // TODO
+    const listing = await Listing.findByIdAndUpdate(
+      req.params.id,
+      { status: 'sold' },
+      { new: true }
+    );
+    if (!listing) {
+      return res.status(404).json({
+        message: 'Listing not found'
+      });
+    }
+    res.json({message: 'Listing marked as sold', listing });
   } catch (err) { next(err); }
 }
